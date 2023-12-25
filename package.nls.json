@@ -1,0 +1,6 @@
+{
+    "cursor-index.commands.index.title": "Insert index on cursor",
+    "cursor-index.commands.incr.title": "Increment selected value",
+    "cursor-index.commands.decr.title": "Decrement selected value",
+    "cursor-index.commands.map.title": "Map selected value"
+}

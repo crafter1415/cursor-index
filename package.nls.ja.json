@@ -1,0 +1,6 @@
+{
+    "cursor-index.commands.index.title": "カーソル位置にインデックスを挿入",
+    "cursor-index.commands.incr.title": "選択された値をインクリメント",
+    "cursor-index.commands.decr.title": "選択された値をデクリメント",
+    "cursor-index.commands.map.title": "選択された値をマップ"
+}

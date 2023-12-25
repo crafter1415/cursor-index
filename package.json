@@ -1,6 +1,6 @@
 {
   "name": "cursor-index",
-  "displayName": "cursor-index",
+  "displayName": "Cursor Index",
   "description": "Insert cursor index on cursor pos",
   "version": "0.0.1",
   "engines": {
@@ -9,15 +9,46 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onCommand:cursor-index.helloWorld"
-  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "cursor-index.helloWorld",
-        "title": "Hello World"
+        "command":"cursor-index.commands.index",
+        "title": "%cursor-index.commands.index.title%"
+      },
+      {
+        "command":"cursor-index.commands.incr",
+        "title": "%cursor-index.commands.incr.title%"
+      },
+      {
+        "command":"cursor-index.commands.decr",
+        "title": "%cursor-index.commands.decr.title%"
+      },
+      {
+        "command":"cursor-index.commands.map",
+        "title": "%cursor-index.commands.map.title%"
+      }
+    ],
+    "keybindings": [
+      {
+        "command":"cursor-index.commands.index",
+        "key": "Alt+Shift+C Alt+Shift+I",
+        "when": "editorTextFocus == true && editorReadonly == false"
+      },
+      {
+        "command":"cursor-index.commands.incr",
+        "key": "Alt+Shift+C Alt+Shift+[Plus]",
+        "when": "editorTextFocus == true && editorReadonly == false"
+      },
+      {
+        "command":"cursor-index.commands.decr",
+        "key": "Alt+Shift+C Alt+Shift+[Minus]",
+        "when": "editorTextFocus == true && editorReadonly == false"
+      },
+      {
+        "command":"cursor-index.commands.map",
+        "key": "Alt+Shift+C Alt+Shift+M",
+        "when": "editorTextFocus == true && editorReadonly == false"
       }
     ]
   },
