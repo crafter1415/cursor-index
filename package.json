@@ -2,6 +2,9 @@
   "name": "cursor-index",
   "displayName": "Cursor Index",
   "description": "Insert cursor index on cursor pos",
+  "repository": {
+    "url": "https://github.com/crafter1415/cursor-index"
+  },
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.85.0"
