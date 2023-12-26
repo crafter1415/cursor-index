@@ -2,5 +2,13 @@
     "cursor-index.commands.index.title": "Insert index on cursor",
     "cursor-index.commands.incr.title": "Increment selected value",
     "cursor-index.commands.decr.title": "Decrement selected value",
-    "cursor-index.commands.map.title": "Map selected value"
+    "cursor-index.commands.map.title": "Map selected value",
+    "cursor-index.map.error": "Syntax Error: {0} (at char {1})",
+    "cursor-index.map.error.parentheses": "Unbalanced parentheses",
+    "cursor-index.map.error.empty": "Empty string",
+    "cursor-index.map.error.function.invalid": "Invalid function name",
+    "cursor-index.map.error.function.dne": "Function does not exist",
+    "cursor-index.map.error.function.argument": "Function is called with wrong amount of arguments",
+    "cursor-index.map.error.unparsable": "Invalid string",
+    "cursor-index.commands.map.error": "Failed to parse given formula: {0}"
 }

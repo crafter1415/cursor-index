@@ -2,5 +2,13 @@
     "cursor-index.commands.index.title": "カーソル位置にインデックスを挿入",
     "cursor-index.commands.incr.title": "選択された値をインクリメント",
     "cursor-index.commands.decr.title": "選択された値をデクリメント",
-    "cursor-index.commands.map.title": "選択された値をマップ"
+    "cursor-index.commands.map.title": "選択された値をマップ",
+    "cursor-index.map.error": "構文エラー: {0} ({1} 文字目)",
+    "cursor-index.map.error.parentheses": "不釣り合いな括弧",
+    "cursor-index.map.error.empty": "空の文字列",
+    "cursor-index.map.error.function.invalid": "不正な関数名",
+    "cursor-index.map.error.function.dne": "存在しない関数",
+    "cursor-index.map.error.function.argument": "引数の数が間違っています",
+    "cursor-index.map.error.unparsable": "不正な文字列",
+    "cursor-index.commands.map.error": "与えられた式を処理できません: {0}"
 }

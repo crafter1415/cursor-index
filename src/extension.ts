@@ -1,15 +1,37 @@
+/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable curly */
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
+import localeEn from "../package.nls.json";
+import localeJa from "../package.nls.ja.json";
+
+export type LocaleKeyType = keyof typeof localeEn;
+
+interface LocaleEntry
+{
+    [key : string] : string;
+}
+const localeTableKey = vscode.env.language;
+const localeTable = Object.assign(localeEn, ((<{[key : string] : LocaleEntry}>{
+    ja : localeJa
+})[localeTableKey] || { }));
+const localeString = (key : string) : string => localeTable[key] || key;
+const localeMap = (key : LocaleKeyType) : string => localeString(key);
 
 function getSelections(editor: vscode.TextEditor) {
 	var initialSelections = editor?.selections;
 	return initialSelections;
 }
 
-function validate(formula: string): boolean {
-	return resolve(formula) !== null;
+function validate(formula: string): string | undefined {
+	var resolved = resolve(formula);
+	return resolved.type === "formula"
+			? undefined
+			: localeMap("cursor-index.map.error")
+					.replace("{0}", localeMap(resolved.message)
+					.replace("{1}", (resolved.location+1).toString()));
 }
 function getArgs(x: number, i: number): {[K: string]: number} {
 	return {
@@ -62,9 +84,11 @@ class Values {
 }
 
 interface FormulaNode {
+	type: "formula";
 	solve(args: {[K: string]: number}): Value;
 }
 class UnaryOperationNode implements FormulaNode {
+	type: "formula" = "formula";
 	right: FormulaNode;
 	operator: string;
 	constructor (right: FormulaNode, operator: string) {
@@ -82,6 +106,7 @@ class UnaryOperationNode implements FormulaNode {
 	}
 }
 class BinaryOperationNode implements FormulaNode {
+	type: "formula" = "formula";
 	left: FormulaNode;
 	right: FormulaNode;
 	operator: string;
@@ -119,6 +144,7 @@ class BinaryOperationNode implements FormulaNode {
 	}
 }
 class TernaryOperationNode implements FormulaNode {
+	type: "formula" = "formula";
 	left: FormulaNode;
 	mid: FormulaNode;
 	right: FormulaNode;
@@ -135,6 +161,7 @@ class TernaryOperationNode implements FormulaNode {
 	}
 }
 class ConstantNode implements FormulaNode {
+	type: "formula" = "formula";
 	value: number;
 	constructor(value: number) {
 		this.value=value;
@@ -156,6 +183,7 @@ class DelayedArray implements RelativeIndexable<Value> {
 	toString = ()=>this.source.map(x=>x.solve(this.args).toString()).toString();
 }
 class ArrayNode implements FormulaNode {
+	type: "formula" = "formula";
 	value: FormulaNode[];
 	constructor(value: FormulaNode[]) {
 		this.value=value;
@@ -165,6 +193,7 @@ class ArrayNode implements FormulaNode {
 	}
 }
 class ArgumentNode implements FormulaNode {
+	type: "formula" = "formula";
 	name: string;
 	constructor(name: string) {
 		this.name=name;
@@ -174,6 +203,7 @@ class ArgumentNode implements FormulaNode {
 	}
 }
 class ArrayIndexNode implements FormulaNode {
+	type: "formula" = "formula";
 	array: FormulaNode;
 	index: FormulaNode;
 	constructor(array: FormulaNode, index: FormulaNode) {
@@ -188,6 +218,7 @@ class ArrayIndexNode implements FormulaNode {
 	}
 }
 class FunctionNode implements FormulaNode {
+	type: "formula" = "formula";
 	name: string;
 	args: FormulaNode[];
 	constructor(name: string, args: FormulaNode[]) {
@@ -249,10 +280,38 @@ class FunctionNode implements FormulaNode {
 		return Values.of();
 	}
 }
-function resolve(str: string): FormulaNode | null {
-	str=str.trim();
-	if (!validateParentheses(str)) return null;
-	if (str === "") return null;
+interface Error {
+	type: "error";
+	message: LocaleKeyType;
+	location: number
+}
+class Errors {
+	static of(message: LocaleKeyType, location: number): Error {
+		return {
+			type: "error",
+			message: message,
+			location: location
+		};
+	}
+}
+function resolve(str: string): FormulaNode | Error {
+	if (str.length == str.trim().length)
+		return resolveTrimmed(str);
+	var prefix = str.length - str.trimStart().length;
+	var result = resolveTrimmed(str.trim());
+	return result.type === "formula"
+			? result
+			: {
+				type: "error",
+				message: result.message,
+				location: result.location + prefix
+			};
+}
+
+function resolveTrimmed(str: string): FormulaNode | Error {
+	var tmp = validateParentheses(str);
+	if (tmp !== null) return tmp;
+	if (str === "") return Errors.of("cursor-index.map.error.empty", 0);
 	var buf;
 	if ((buf=resolveOp(str, ["","?",":"])).match
 			|| (buf=resolveOp(str, ["","||"])).match
@@ -280,7 +339,7 @@ function resolve(str: string): FormulaNode | null {
 	}
 	if (str.startsWith("(") && str.endsWith(")"))
 		return resolve(str.substring(1, str.length-1));
-	if (str.startsWith("[") && str.endsWith("]")) {
+	if (str.endsWith("]")) {
 		var index = lookupAll(str, "]");
 		if (index.length === 1) {
 			// 配列そのもの
@@ -288,38 +347,50 @@ function resolve(str: string): FormulaNode | null {
 			index = lookupAll(sub, ",");
 			var array = [];
 			for (let i=-1;i<index.length;i++) {
-				var item = sub.substring(i===-1?0:index[i], i+1===index.length?sub.length:index[i+1]);
+				var from = i===-1?0:index[i];
+				var to = i+1===index.length?sub.length:index[i+1];
+				var item = sub.substring(from, to);
 				var resolved = resolve(item);
-				if (resolved === null) return null;
+				if (resolved.type === "error") return Errors.of(resolved.message, resolved.location+from);
 				array.push(resolved);
 			}
 			return new ArrayNode(array);
 		} else {
 			// 配列+アクセッサー
-			var obj = resolve(str.substring(0, index[index.length-1]+1));
-			var accessor = resolve(str.substring(index[index.length-1]+2, str.length-1));
-			if (obj === null || accessor === null) return null;
-			return new ArrayIndexNode(obj, accessor);
+			var objs = [
+				[0, index[index.length-1]+1],
+				[index[index.length-1]+2, str.length-1]
+			];
+			var resolved_ = [];
+			for (var entry of objs) {
+				var item_ = resolve(str.substring(entry[0], entry[1]));
+				if (item_.type === "error")
+					return Errors.of(item_.message, item_.location+entry[0]);
+				resolved_.push(item_);
+			}
+			return new ArrayIndexNode(resolved_[0], resolved_[1]);
 		}
 	}
 	if (str.endsWith(")")) {
 		var matched = /^([a-zA-Z0-9_]+)\((.*)\)$/.exec(str);
-		if (matched === null) return null;
+		if (matched === null) return Errors.of("cursor-index.map.error.function.invalid", 0);
 		var args = matched[2];
 		var index = lookupAll(matched[2], ",");
 		var array = [];
 		if (matched[2] !== "") {
 			for (let i=-1;i<index.length;i++) {
-				var item = matched[2].substring(i===-1?0:index[i], i+1===index.length?matched[2].length:index[i+1]);
+				var from = i===-1?0:index[i];
+				var to = i+1===index.length?matched[2].length:index[i+1];
+				var item = matched[2].substring(from, to);
 				var resolved = resolve(item);
-				if (resolved === null) return null;
+				if (resolved.type === "error") return Errors.of(resolved.message, resolved.location+from);
 				array.push(resolved);
 			}
 		}
 		switch (matched[1]) {
 			// 0 arg
 			case "random":
-				if (array.length !== 0) return null;
+				if (array.length !== 0) return Errors.of("cursor-index.map.error.function.argument", 0);
 				break;
 			// 1 arg
 			case "abs":
@@ -350,13 +421,13 @@ function resolve(str: string): FormulaNode | null {
 			case "tan":
 			case "tanh":
 			case "trunc":
-				if (array.length !== 1) return null;
+				if (array.length !== 1) return Errors.of("cursor-index.map.error.function.argument", 0);
 				break;
 			// 2 arg
 			case "atan2":
 			case "imul":
 			case "pow":
-				if (array.length !== 2) return null;
+				if (array.length !== 2) return Errors.of("cursor-index.map.error.function.argument", 0);
 				break;
 			// ... arg
 			case "hypot":
@@ -364,7 +435,7 @@ function resolve(str: string): FormulaNode | null {
 			case "min":
 				break;
 			default:
-				return null;
+				return Errors.of("cursor-index.map.error.function.dne", 0);
 		}
 		return new FunctionNode(matched[1], array);
 	}
@@ -372,41 +443,53 @@ function resolve(str: string): FormulaNode | null {
 	if (variable !== null)
 		return new ArgumentNode(variable[0]);
 	var number = Number(str);
-	return Number.isNaN(number) ? null : new ConstantNode(number);
+	return Number.isNaN(number) 
+			? Errors.of("cursor-index.map.error.unparsable", 0)
+			: new ConstantNode(number);
 }
-function resolveOp(str: string, operator: string[]): {match: false} | {match: true, value: FormulaNode | null} {
+function resolveOp(str: string, operator: string[]): {match: false} | {match: true, value: FormulaNode | Error} {
 	switch (operator.length) {
 		case 1:
 			if (!str.startsWith(operator[0])) break;
 			var obj = resolve(str.substring(operator[0].length));
-			if (obj === null) return {match: true, value: null};
+			if (obj.type === "error") return {match: true, value: Errors.of(obj.message, obj.location+operator[0].length)};
 			return {match: true, value: new UnaryOperationNode(obj, operator[0])};
 		case 2:
 			var index = lookupBackward(str, operator[1]);
 			if (index === -1) break;
 			var objs = [
-				resolve(str.substring(0, index)),
-				resolve(str.substring(index+1))
+				[0, index],
+				[index+1]
 			];
-			for (var obj of objs)
-				if (obj === null) return {match: true, value: null};
-			return {match: true, value: new BinaryOperationNode(objs[0]!, objs[1]!, operator[1])};
+			var resolved = [];
+			for (var entry of objs) {
+				var item = resolve(str.substring(entry[0], entry[1]));
+				if (item.type === "error")
+					return {match: true, value: Errors.of(item.message, item.location+entry[0])};
+				resolved.push(item);
+			}
+			return {match: true, value: new BinaryOperationNode(resolved[0], resolved[1], operator[1])};
 		case 3:
 			var index0 = lookupBackward(str, operator[1]);
 			var index1 = lookupBackward(str, operator[2]);
 			if (index0 === -1 && index1 === -1) break;
 			objs = [
-				resolve(str.substring(0, index0)),
-				resolve(str.substring(index0+1, index1)),
-				resolve(str.substring(index1+1))
+				[0, index0],
+				[index0+1, index1],
+				[index1+1]
 			];
-			for (var obj of objs)
-				if (obj === null) return {match: true, value: null};
-			return {match: true, value: new TernaryOperationNode(objs[0]!, objs[1]!, objs[2]!)};
+			resolved = [];
+			for (var entry of objs) {
+				var item = resolve(str.substring(entry[0], entry[1]));
+				if (item.type === "error")
+					return {match: true, value: Errors.of(item.message, item.location+entry[0])};
+				resolved.push(item);
+			}
+			return {match: true, value: new TernaryOperationNode(resolved[0], resolved[1], resolved[2])};
 	}
 	return {match: false};
 }
-function validateParentheses(str: string): boolean {
+function validateParentheses(str: string): Error | null {
 	var stack: string[] = [];
 	for (let i=0;i<str.length;i++) {
 		switch (str.charAt(i)) {
@@ -417,16 +500,16 @@ function validateParentheses(str: string): boolean {
 				stack.push('[');
 				break;
 			case ')':
-				if (stack.length === 0) return false;
-				if (stack.pop() !== '(') return false;
+				if (stack.length === 0) return Errors.of("cursor-index.map.error.parentheses", i);
+				if (stack.pop() !== '(') return Errors.of("cursor-index.map.error.parentheses", i);
 				break;
 			case ']':
-				if (stack.length === 0) return false;
-				if (stack.pop() !== '[') return false;
+				if (stack.length === 0) return Errors.of("cursor-index.map.error.parentheses", i);
+				if (stack.pop() !== '[') return Errors.of("cursor-index.map.error.parentheses", i);
 				break;
 		}
 	}
-	return true;
+	return null;
 }
 function lookupAll(str: string, key: string): number[] {
 	var depth = 0;
@@ -518,23 +601,24 @@ export function activate(context: vscode.ExtensionContext) {
 		if (editor === undefined) return;
 		
 		vscode.window.showInputBox({
-			validateInput: s=>validate(s)?undefined:"Syntax Error",
+			validateInput: validate,
 			placeHolder: "x => ?"
 		}).then(s => {
 			if (s === undefined) return;
 			var formula = resolve(s);
-			if (formula === null) {
-				vscode.window.showErrorMessage("Failed to parse given formula");
+			if (formula.type === "error") {
+				vscode.window.showErrorMessage(localeMap("cursor-index.commands.map.error")
+						.replace("{0}", localeMap(formula.message)));
 				return;
 			}
 			editor?.edit(function (builder) {
 				getSelections(editor!).forEach(function (selection, i) {
 					var x = Number(editor?.document.getText(selection));
-					var result = formula!.solve(getArgs(x, i));
+					var result = (formula as FormulaNode).solve(getArgs(x, i));
 					builder.replace(selection, result.toString());
 				});
 			});
-			});
+		});
 
 		editor?.edit(function (builder) {
 			getSelections(editor!).forEach(function (selection, i) {
