@@ -30,8 +30,8 @@ function validate(formula: string): string | undefined {
 	return resolved.type === "formula"
 			? undefined
 			: localeMap("cursor-index.map.error")
-					.replace("{0}", localeMap(resolved.message)
-					.replace("{1}", (resolved.location+1).toString()));
+					.replace("{0}", localeMap(resolved.message))
+					.replace("{1}", (resolved.location+1).toString());
 }
 function getArgs(x: number, i: number): {[K: string]: number} {
 	return {
@@ -63,14 +63,14 @@ class Values {
 				getAsArray: () => null,
 				getAsNumber: () => x,
 				isEmpty: () => false,
-				toString: x.toString
+				toString: () => x.toString()
 			};
 		} else if (typeof x === "object") {
 			return {
 				getAsArray: () => x,
 				getAsNumber: () => null,
 				isEmpty: () => false,
-				toString: x.toString
+				toString: () => x.toString()
 			};
 		} else {
 			return {
@@ -295,7 +295,7 @@ class Errors {
 	}
 }
 function resolve(str: string): FormulaNode | Error {
-	if (str.length == str.trim().length)
+	if (str.length === str.trim().length)
 		return resolveTrimmed(str);
 	var prefix = str.length - str.trimStart().length;
 	var result = resolveTrimmed(str.trim());
@@ -340,26 +340,28 @@ function resolveTrimmed(str: string): FormulaNode | Error {
 	if (str.startsWith("(") && str.endsWith(")"))
 		return resolve(str.substring(1, str.length-1));
 	if (str.endsWith("]")) {
-		var index = lookupAll(str, "]");
-		if (index.length === 1) {
+		var index_ = lookupBackward(str, "[");
+		if (index_ === 0) {
 			// 配列そのもの
 			var sub = str.substring(1, str.length-1);
-			index = lookupAll(sub, ",");
+			var index = lookupAll(sub, ",");
 			var array = [];
-			for (let i=-1;i<index.length;i++) {
-				var from = i===-1?0:index[i];
-				var to = i+1===index.length?sub.length:index[i+1];
-				var item = sub.substring(from, to);
-				var resolved = resolve(item);
-				if (resolved.type === "error") return Errors.of(resolved.message, resolved.location+from);
-				array.push(resolved);
+			if (sub !== "") {
+				for (let i=-1;i<index.length;i++) {
+					var from = i===-1?0:index[i]+1;
+					var to = i+1===index.length?sub.length:index[i+1];
+					var item = sub.substring(from, to);
+					var resolved = resolve(item);
+					if (resolved.type === "error") return Errors.of(resolved.message, resolved.location+from);
+					array.push(resolved);
+				}
 			}
 			return new ArrayNode(array);
 		} else {
 			// 配列+アクセッサー
 			var objs = [
-				[0, index[index.length-1]+1],
-				[index[index.length-1]+2, str.length-1]
+				[0, index_],
+				[index_+1, str.length-1]
 			];
 			var resolved_ = [];
 			for (var entry of objs) {
@@ -448,6 +450,7 @@ function resolveTrimmed(str: string): FormulaNode | Error {
 			: new ConstantNode(number);
 }
 function resolveOp(str: string, operator: string[]): {match: false} | {match: true, value: FormulaNode | Error} {
+	s:
 	switch (operator.length) {
 		case 1:
 			if (!str.startsWith(operator[0])) break;
@@ -459,13 +462,15 @@ function resolveOp(str: string, operator: string[]): {match: false} | {match: tr
 			if (index === -1) break;
 			var objs = [
 				[0, index],
-				[index+1]
+				[index+operator[1].length]
 			];
 			var resolved = [];
 			for (var entry of objs) {
 				var item = resolve(str.substring(entry[0], entry[1]));
-				if (item.type === "error")
+				if (item.type === "error") {
+					if (operator[1] === "*") break s;
 					return {match: true, value: Errors.of(item.message, item.location+entry[0])};
+				}
 				resolved.push(item);
 			}
 			return {match: true, value: new BinaryOperationNode(resolved[0], resolved[1], operator[1])};
@@ -473,10 +478,11 @@ function resolveOp(str: string, operator: string[]): {match: false} | {match: tr
 			var index0 = lookupBackward(str, operator[1]);
 			var index1 = lookupBackward(str, operator[2]);
 			if (index0 === -1 && index1 === -1) break;
+			if (index0 === -1 || index1 === -1) return {match: true, value: Errors.of("cursor-index.map.error.unparsable", 0)};
 			objs = [
 				[0, index0],
-				[index0+1, index1],
-				[index1+1]
+				[index0+operator[1].length, index1],
+				[index1+operator[2].length]
 			];
 			resolved = [];
 			for (var entry of objs) {
@@ -617,13 +623,6 @@ export function activate(context: vscode.ExtensionContext) {
 					var result = (formula as FormulaNode).solve(getArgs(x, i));
 					builder.replace(selection, result.toString());
 				});
-			});
-		});
-
-		editor?.edit(function (builder) {
-			getSelections(editor!).forEach(function (selection, i) {
-				var x = Number(editor?.document.getText(selection));
-				builder.replace(selection, (x+1).toString());
 			});
 		});
 	}));
